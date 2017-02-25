@@ -1,0 +1,5 @@
+---
+# group_vars/qualnet
+# vars for gateways in qualnet - includes DMZ
+axway_group_name: corp
+...

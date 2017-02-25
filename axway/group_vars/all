@@ -1,0 +1,16 @@
+---
+# group_vars/all.yml
+# This file is always loaded
+services_path: /local/mnt/services
+workspace_path: /local/mnt/workspace
+
+git_path: ~/ansibleGitRepos
+
+axway_base_path: "{{ services_path }}/axway/7.3.1"
+axway_instance_path: groups/group-2/instance-1
+axway_scripts_path: "{{ axway_base_path }}/scripts"
+
+become_method: sudo
+
+webauth_email: "waa_alerts@qualcomm.com"
+...

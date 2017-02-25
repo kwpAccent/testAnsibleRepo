@@ -1,0 +1,7 @@
+---
+# axway/roles/configure/handlers/main.yml
+- name: Start gateway
+  command: "{{ axway_base_path }}/apigateway/posix/bin/startinstance -n '{{ ansible_hostname }}' -g '{{ axway_group_name }}' -d"
+  become: yes
+  become_user: "{{ axway_user }}"
+...

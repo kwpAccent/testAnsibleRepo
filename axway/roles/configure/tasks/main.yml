@@ -1,0 +1,133 @@
+---
+# axway/roles/configure/tasks/main.yml
+- block:
+  - name: Clone web-auth-admin/vordel.git
+    local_action: 
+      git 
+        repo=git@github.qualcomm.com:web-auth-admin/vordel.git
+        dest={{ git_path }}
+    register: git_items
+  
+  - name: Copy over scripts
+    copy:
+      src={{ git_path }}/7.3.1/scripts/
+      dest={{ axway_scripts_path }}
+      owner={{ axway_user }}
+      backup=yes
+    register: copyScripts
+    become: yes
+    become_user: "{{ axway_user }}"
+  
+  - name: Copy over svcwatch scripts for production boxes
+    copy:
+      src={{ git_path }}/7.3.1/apigateway/samples/scripts/io/
+      dest={{ axway_base_path }}/apigateway/samples/scripts/io
+      owner={{ axway_user }}
+      mode=0750
+    register: copySVCWatchScripts
+    become: yes
+    become_user: "{{ axway_user }}"
+    when: "'production' in group_names"
+  
+  - name: Add svcwatch cron job for production boxes
+    cron:
+      name="Daily svcwatch export"
+      job="/local/mnt/services/axway/7.3.1/scripts/export_vordel_data.sh"
+      hour=0
+      minute=1
+    register: editSVCWatchCron
+    become: yes
+    become_user: "{{ axway_user }}"
+    when: "'production' in group_names"
+  
+  - name: Read cron_config.json
+    local_action:
+      shell cat {{ git_path }}/7.3.1/scripts/cron_config.json
+    changed_when: False
+    register: cronConfig
+  
+  - name: Format cronConfig
+    set_fact:
+      cronConfig: "{{ cronConfig.stdout| from_json }}"
+    changed_when: False
+  
+  - name: Create cron job from cronConfig
+    cron:
+      name={{ item.name }}
+      job={{ item.job }}
+      hour={{ item.hour }}
+      minute={{ item.minute }}
+    with_items: "{{ cronConfig }}"
+    register: editCron
+    become: yes
+    become_user: "{{ axway_user }}"
+  
+  - name: Copy over licenses
+    copy:
+      src={{ git_path }}/7.3.1/apigateway/conf/licenses/
+      dest={{ axway_base_path }}/apigateway/conf/licenses
+      owner={{ axway_user }}
+      mode=0755
+    register: copyLicenses
+    become: yes
+    become_user: "{{ axway_user }}"
+  
+  - name: Copy over instance/conf
+    copy:
+      src={{ git_path }}/7.3.1/apigateway/groups/group-2/instance-1/conf/
+      dest={{ axway_base_path }}/apigateway/groups/group-2/instance-1/conf
+      owner={{ axway_user }}
+      mode=0644
+    become: yes
+    become_user: "{{ axway_user }}"
+    register: copyInstanceConf
+  
+  - name: Copy over system/conf
+    copy:
+      src={{ git_path }}/7.3.1/apigateway/system/conf/
+      dest={{ axway_base_path }}/apigateway/system/conf
+      owner={{ axway_user }}
+      mode=0644
+    become: yes
+    become_user: "{{ axway_user }}"
+    register: copySystemConf
+
+  - name: Copy over libs for AWS OAuth
+    copy:
+      src={{ git_path }}/7.3.1/apigateway/ext/lib/
+      dest={{ axway_base_path }}/apigateway/ext/lib
+      owner={{ axway_user }}
+      mode=0755
+    become: yes
+    become_user: "{{ axway_user }}"
+    when: "'aws' in group_names"
+    register: copyExtLibs
+  
+  - name: Stop gateway
+    command: "{{ axway_base_path }}/apigateway/posix/bin/startinstance -n '{{ ansible_hostname }}' -g '{{ axway_group_name }}' -k"
+    become: yes
+    when: (copyInstanceConf.changed or copySystemConf.changed)
+    become_user: "{{ axway_user }}"
+    register: vordelRestarted
+    notify:
+      - Start gateway   
+
+  - name: Send notification
+    local_action: mail
+      host='127.0.0.1'
+      port=25
+      subject='Ansible Vordel - configure_vordel'
+      body='Ansible modified Vordel configs on {{ ansible_hostname }}\nRestarted vordel - {{ vordelRestarted.changed }}\n\nModified Instace Conf - {{ copyInstanceConf.changed }}\nModified System Conf - {{ copySystemConf.changed }}\nModified Licenses - {{ copyLicenses.changed }}\nModified Scripts - {{ copyScripts.changed }}\nModified Cron - {{ editCron.changed }}\nModified SVC Watch Scripts - {{ copySVCWatchScripts.changed }}\nModified SVCWatch cron - {{editSVCWatchCron.changed }}\nModified Ext Libs - {{ copyExtLibs.changed }}'
+      from='{{ ansible_user_id }}@qualcomm.com'
+      to='{{webauth_email}}'
+    when: (copyInstanceConf.changed or copySystemConf.changed or copyLicenses.changed or editCron.changed or editSVCWatchCron.changed or copyScripts.changed or copySVCWatchScripts.changed or copyExtLibs.changed)
+
+  rescue:
+  - local_action: mail
+      host='127.0.0.1'
+      port=25
+      subject='Ansible Vordel - Error - configure_vordel'
+      body='Error executing configure_vordel for {{ ansible_hostname }}\nCheck log files at ~/ansibleLog'
+      from='{{ ansible_user_id }}@qualcomm.com'
+      to='{{webauth_email}}'
+...
