@@ -1,0 +1,6 @@
+---
+# axway/roles/test/tasks/main.yml
+- name: Test command
+  shell: cat /etc/hosts
+  become: yes
+...

@@ -1,0 +1,7 @@
+# axway/configure_vordel.yml
+---
+- hosts: all
+  roles:
+    - test
+  serial: 1
+...
