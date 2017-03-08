@@ -1,5 +1,16 @@
 ---
 # axway/roles/test/tasks/main.yml
-- name: Test command
-  shell: cat /etc/hosts
+- name: echo hostname
+  shell: echo $HOST
+
+- name: Create test directory
+  file:
+    path=/tmp/ansibleTowerTest
+    state=directory
+    mode=0755
+
+- name: Copy over sample file
+  copy:
+    src=sampleFile.txt
+    dest=/tmp/ansibleTowerTest/sampleFile.txt
 ...
